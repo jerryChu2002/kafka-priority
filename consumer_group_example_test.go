@@ -16,15 +16,35 @@ func (h exampleConsumerGroupHandler) ConsumeClaim(sess ConsumerGroupSession, cla
 	}
 	return nil
 }
-func (h exampleConsumerGroupHandler) ConsumeClaimsWithPriority(ConsumerGroupSession, []ConsumerGroupClaim) error {
+func (h exampleConsumerGroupHandler) ConsumeClaimsWithPriority(cgs ConsumerGroupSession, cgcs []ConsumerGroupClaim) error {
+	for _, cgc := range cgcs {
+		for {
+			select {
+			case msg, ok := <-cgc.Messages():
+				if !ok {
+					// 如果通道关闭，跳出循环
+					fmt.Printf("No more messages in topic:%q partition:%d, moving to next claim.\n", cgc.Topic(), cgc.Partition())
+					break
+				}
+				fmt.Printf("Message topic:%q partition:%d offset:%d\n", msg.Topic, msg.Partition, msg.Offset)
+				cgs.MarkMessage(msg, "")
+			default:
+				// 没有消息时，跳到下一个 ConsumerGroupClaim
+				fmt.Printf("No messages in topic:%q partition:%d, moving to next claim.\n", cgc.Topic(), cgc.Partition())
+				break
+			}
+		}
+	}
 	return nil
 }
-func (h exampleConsumerGroupHandler) SortClaimsWithPriority([]ConsumerGroupClaim) []ConsumerGroupClaim {
+
+func (h exampleConsumerGroupHandler) SortClaimsWithPriority(cgs []ConsumerGroupClaim) []ConsumerGroupClaim {
+	//TODO 根据已知的topic做优先级排序即可，到ConsumeClaimsWithPriority时先消费排序靠前的claim
 	return nil
 }
 
 func (h exampleConsumerGroupHandler) IsPriorityConsumer() bool {
-	return false
+	return true
 }
 func ExampleConsumerGroup() {
 	config := NewTestConfig()
